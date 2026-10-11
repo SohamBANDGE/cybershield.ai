@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberShield AI: check a link or message</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E9EFF5;--card:#fff;--ink:#0F2238;--mute:#5B6B7D;--line:#CFD9E3;--brand:#0E5FD8;--safe:#1E8E5A;--warn:#C77700;--bad:#C62F3B}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0C1624;--card:#13243A;--ink:#E7EEF7;--mute:#9AAABD;--line:#243B57;--brand:#5B9BFF}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Sora,system-ui,sans-serif;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header,main,form{width:100%;max-width:720px;margin:0 auto;padding:0 16px}
+header{padding-top:24px;padding-bottom:8px}
+h1{font-size:clamp(1.6rem,5vw,2.3rem);line-height:1.1;font-weight:800;margin:0 0 8px;letter-spacing:-.02em}
+header p{margin:0;color:var(--mute);max-width:56ch}
+main{flex:1;overflow-y:auto;padding-top:16px;padding-bottom:16px}
+.me{background:var(--brand);color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;margin:12px 0 8px auto;width:fit-content;max-width:90%;word-break:break-word}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px 16px 16px 16px;padding:16px;margin-bottom:8px}
+.verdict{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.verdict b{font-size:1.3rem}.num{font-size:2.2rem;font-weight:800;font-variant-numeric:tabular-nums}
+.meter{position:relative;height:10px;border-radius:5px;margin:10px 0 14px;background:linear-gradient(90deg,var(--safe) 0 30%,var(--warn) 30% 60%,var(--bad) 60%)}
+.meter i{position:absolute;top:-5px;width:4px;height:20px;border-radius:2px;background:var(--ink);transform:translateX(-2px);outline:2px solid var(--card)}
+ul{margin:0;padding-left:20px}li{margin:4px 0}
+.fb{margin-top:12px;display:flex;gap:8px;align-items:center;color:var(--mute);font-size:.85rem}
+button{font:inherit;cursor:pointer}
+.fb button{background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:4px 10px}
+form{display:flex;gap:8px;padding-top:8px;padding-bottom:16px}
+textarea{flex:1;resize:none;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.go{background:var(--brand);color:#fff;border:0;border-radius:12px;padding:0 20px;font-weight:600}.go:disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.note{color:var(--mute);font-size:.8rem;text-align:center;padding:0 16px 8px}
+@media(prefers-reduced-motion:no-preference){.meter i{transition:left .6s cubic-bezier(.2,.8,.2,1)}}
+</style></head>
+<body>
+<header><h1>Is it a scam? Paste it and find out.</h1>
+<p>Drop in a link, SMS, or email. You get a risk score and plain-language reasons.</p></header>
+<main id="feed" aria-live="polite"></main>
+<div id="root"></div>
+<p class="note">Your text is scored on the server and never stored. Links are never opened.</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+const {useState,useEffect,useRef,createElement:h}=React;
+const isUrl=t=>/^(https?:\/\/)?[^\s\/]+\.[a-z]{2,}(\/\S*)?$/i.test(t.trim());
+const COL={safe:"var(--safe)",suspicious:"var(--warn)",dangerous:"var(--bad)"};
+const TXT={safe:"Looks low risk",suspicious:"Be careful",dangerous:"Likely a scam"};
+function Result({it}){
+  const [fb,setFb]=useState(null);const d=it.data;
+  if(it.error)return h("div",{className:"card",role:"alert"},it.error);
+  const send=async c=>{setFb(c);try{await fetch("/api/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:d.id,correct:c})})}catch(e){}};
+  return h("div",{className:"card"},
+    h("div",{className:"verdict"},h("b",{style:{color:COL[d.label]}},TXT[d.label]),h("span",{className:"num"},d.score,h("small",{style:{fontSize:".9rem",color:"var(--mute)"}},"/100"))),
+    h("div",{className:"meter",role:"img","aria-label":"Risk "+d.score+" out of 100"},h("i",{style:{left:d.score+"%"}})),
+    h("ul",null,d.reasons.map((r,i)=>h("li",{key:i},r))),
+    h("div",{className:"fb"},fb===null?[h("span",{key:"q"},"Was this right?"),h("button",{key:"y",onClick:()=>send(true)},"Yes"),h("button",{key:"n",onClick:()=>send(false)},"No")]:"Thanks, feedback saved."));
+}
+function Feed({items}){
+  const end=useRef();useEffect(()=>{end.current&&end.current.scrollIntoView({behavior:"smooth"})},[items]);
+  return h("div",null,items.length?null:h("p",{className:"note"},"Try: paypa1-secure-login.xyz"),
+    items.map((it,i)=>h("div",{key:i},h("div",{className:"me"},it.t.slice(0,300)),it.data||it.error?h(Result,{it}):h("div",{className:"card"},"Checking…"))),h("div",{ref:end}));
+}
+function App(){
+  const [items,setItems]=useState([]);const [text,setText]=useState("");const [busy,setBusy]=useState(false);
+  useEffect(()=>{ReactDOM.createRoot(document.getElementById("feed")).render(h(Feed,{items}))},[items]);
+  async function run(e){e.preventDefault();const t=text.trim();if(t.length<3||busy)return;
+    const kind=isUrl(t)?"url":"message";setBusy(true);setText("");let item={t};
+    try{const r=await fetch("/api/analyze/"+kind,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t})});
+      const j=await r.json();if(!r.ok)throw new Error(typeof j.detail==="string"?j.detail:"Please enter at least 3 characters.");item.data=j}
+    catch(err){item.error=err.message||"Could not reach the server. Try again."}
+    setItems(x=>[...x,item]);setBusy(false)}
+  return h("form",{onSubmit:run},
+    h("textarea",{rows:2,value:text,maxLength:5000,placeholder:"Paste a link or message",onChange:e=>setText(e.target.value),"aria-label":"Link or message to check",onKeyDown:e=>{if(e.key==="Enter"&&!e.shiftKey)run(e)}}),
+    h("button",{className:"go",disabled:busy},busy?"Checking":"Check"));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script></body></html>
